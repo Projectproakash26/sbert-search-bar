@@ -17,5 +17,4 @@ FAISS index generated and saved in output!
 [info] data has not changed, checking if code changes have not broken the search index
 CHANGE VALIDATION: SUCCESS
 smart choices
-this is first push and try
-new one
+same
