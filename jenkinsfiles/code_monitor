@@ -13,12 +13,12 @@ pipeline {
                     patterns: [[pattern: '*', type: 'INCLUDE']
                 ])
 
-                echo "[info] Pull Request author: ${env.ghprbPullAuthorLogin}"
-                echo "[info] Pull Request Branch: ${env.ghprbSourceBranch}"
-                echo "[info] Pull Request Target Branch: ${env.ghprbTargetBranch}"
+                echo "[info] Pull Request author: ${env.CHANGE_BRANCH}"
+                echo "[info] Pull Request Branch: ${env.CHANGE_BRANCH}"
+                echo "[info] Pull Request Target Branch: ${env.CHANGE_TARGET}"
                 echo "[info] Current Branch: ${env.GIT_BRANCH}"
-                echo "[info] Current Pull Request ID: ${env.ghprbPullId}"
-                echo "[info] Current Pull Request Title: ${env.ghprbPullTitle}"
+                echo "[info] Current Pull Request ID: ${env.CHANGE_ID}"
+                echo "[info] Current Pull Request Title: ${env.CHANGE_TITLE}"
                 script {
                     // retrieve github personal access token from jenkins parameters
                     def ghPersonalAccessToken = params['GH_PERSONAL_ACCESS_TOKEN']
@@ -49,13 +49,13 @@ pipeline {
                     // checkout branches and do necessary pre-build merges
                     checkout([
                         $class: 'GitSCM', 
-                        branches: [[name: "origin/${env.ghprbSourceBranch}"]], 
+                        branches: [[name: "origin/${env.CHANGE_BRANCH}"]], 
                         doGenerateSubmoduleConfigurations: false, 
                         extensions: [], 
                         submoduleCfg: [], 
                         userRemoteConfigs: [[credentialsId: "github-credentials", url: "https://Projectproakash26:${ghPersonalAccessToken}@github.com/Projectproakash26/sbert-search-bar.git"]]
                     ])
-                    sh("git pull origin ${env.ghprbSourceBranch} --rebase")
+                    sh("git pull origin ${env.CHANGE_BRANCH} --rebase")
                     
                     checkout([
                         $class: 'GitSCM', 
@@ -68,7 +68,7 @@ pipeline {
                     sh("git checkout stage")
                     sh("git reset --hard HEAD")
                     sh("git pull origin stage --rebase")
-                    sh("git merge origin/${env.ghprbSourceBranch} --no-edit")
+                    sh("git merge origin/${env.CHANGE_BRANCH} --no-edit")
                     sh("git branch")
                 }  
             }
@@ -138,7 +138,7 @@ pipeline {
                         // if there are changes, push the changes to stage
                         echo "[info] Changes in data, merging to stage"
                         sh("git add .")
-                        sh("git commit -m \"[jenkins-server autocommit] JenkinsMerge :: ${env.ghprbPullTitle}->#${env.ghprbPullId}\"")
+                        sh("git commit -m \"[jenkins-server autocommit] JenkinsMerge :: ${env.CHANGE_TITLE}->#${env.CHANGE_ID}\"")
                         sh("git push origin stage")
                     } else {
                         // if there are no changes, abort the deployment
