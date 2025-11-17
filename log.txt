@@ -16,7 +16,3 @@ FAISS index generated and saved in output!
 [info] validating data change
 [info] data has not changed, checking if code changes have not broken the search index
 CHANGE VALIDATION: SUCCESS
-smart choices
-same
-new changes is the separate source
-system config is here to automatically uodte the chnages
