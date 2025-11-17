@@ -15,4 +15,4 @@ FAISS index generated and saved in output!
 230 data/project_mappings.csv
 [info] validating data change
 [info] data has not changed, checking if code changes have not broken the search index
-CHANGE VALIDATION: SUCCESS
+CHANGE VALIDATION: SUCCESS to 
