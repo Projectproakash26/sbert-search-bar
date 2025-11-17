@@ -5,7 +5,7 @@
 Raw data generated!
 Project mappings saved to query the results!
 path: data/project_mappings.csv
-Abbreviations data read!
+Abbreviations data read
 Data preprocessing done
 Embeddings created
 FAISS index generated and saved in output!
