@@ -19,3 +19,4 @@ CHANGE VALIDATION: SUCCESS
 smart choices
 same
 new changes is the separate source
+system config is here to automatically uodte the chnages
