@@ -17,3 +17,4 @@ FAISS index generated and saved in output!
 [info] data has not changed, checking if code changes have not broken the search index
 CHANGE VALIDATION: SUCCESS
 new changes
+different
