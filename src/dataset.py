@@ -1,4 +1,4 @@
-# import libraries
+# import libraries for importing modules
 import pandas as pd
 
 # 1. Project Description Data
