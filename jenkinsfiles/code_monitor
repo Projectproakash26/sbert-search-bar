@@ -1,11 +1,28 @@
 pipeline {
     agent any
+
     environment {
         PATH = "$WORKSPACE/miniconda/bin:$PATH"
     }
+
     stages {
+
+        stage('Init Vars') {
+            steps {
+                script {
+                    sourceBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
+                    targetBranch = env.CHANGE_TARGET ?: 'stage'
+
+                    echo "[info] Source Branch: ${sourceBranch}"
+                    echo "[info] Target Branch: ${targetBranch}"
+                    echo "[info] Current Branch: ${env.BRANCH_NAME}"
+                }
+            }
+        }
+
         stage('Repos') {
             steps {
+
                 cleanWs(
                     deleteDirs: true,
                     notFailBuild: true,
@@ -13,174 +30,158 @@ pipeline {
                 )
 
                 script {
-                    // Determine which branch to use - PR branch or regular branch
-                    def sourceBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
-                    def targetBranch = env.CHANGE_TARGET ?: 'stage'
-                    
-                    echo "[info] Source Branch: ${sourceBranch}"
-                    echo "[info] Target Branch: ${targetBranch}"
-                    echo "[info] Current Branch: ${env.BRANCH_NAME}"
-                    echo "[info] Is PR Build: ${env.CHANGE_ID != null}"
-                    
-                    if (env.CHANGE_ID) {
-                        echo "[info] Pull Request ID: ${env.CHANGE_ID}"
-                        echo "[info] Pull Request Title: ${env.CHANGE_TITLE}"
-                    }
-                    
-                    // Checkout prod branch to backup data
+                    // checkout prod to backup data
                     checkout([
-                        $class: 'GitSCM', 
-                        branches: [[name: "origin/prod"]], 
-                        doGenerateSubmoduleConfigurations: false, 
-                        extensions: [], 
-                        submoduleCfg: [], 
+                        $class: 'GitSCM',
+                        branches: [[name: "origin/prod"]],
                         userRemoteConfigs: [[
-                            credentialsId: "github-credentials", 
+                            credentialsId: "github-credentials",
                             url: "https://github.com/Projectproakash26/sbert-search-bar.git"
                         ]]
                     ])
                 }
-                
-                sh '''#!/usr/bin/env bash
-                echo '[info] Make backup of current prod data and model'
-                rm -f log.txt || echo "[info] log.txt not found -- skipping"
-                rm -rf temp_ml || echo "[info] temp_ml not found -- skipping"
+
+                sh '''
+                #!/usr/bin/env bash
+                echo "[info] Backup prod data & model"
+
+                rm -f log.txt || true
+                rm -rf temp_ml || true
                 mkdir -p temp_ml
-                
-                # Only copy if files exist
-                if [ -f data/project_mappings.csv ]; then
-                    cp data/project_mappings.csv temp_ml/project_mappings.csv
-                fi
-                if [ -f output/search.index ]; then
-                    cp output/search.index temp_ml/search.index
-                fi
+
+                [ -f data/project_mappings.csv ] && cp data/project_mappings.csv temp_ml/project_mappings.csv
+                [ -f output/search.index ] && cp output/search.index temp_ml/search.index
                 '''
 
                 script {
-                    def sourceBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
-                    
-                    // Checkout source branch (PR branch or pushed branch)
+                    // checkout source branch
                     checkout([
-                        $class: 'GitSCM', 
-                        branches: [[name: "origin/${sourceBranch}"]], 
-                        doGenerateSubmoduleConfigurations: false, 
-                        extensions: [], 
-                        submoduleCfg: [], 
+                        $class: 'GitSCM',
+                        branches: [[name: "origin/${sourceBranch}"]],
                         userRemoteConfigs: [[
-                            credentialsId: "github-credentials", 
+                            credentialsId: "github-credentials",
                             url: "https://github.com/Projectproakash26/sbert-search-bar.git"
                         ]]
                     ])
-                    sh("git pull origin ${sourceBranch} --rebase")
-                    
-                    // Checkout stage and merge source branch
+                    sh "git pull origin ${sourceBranch} --rebase"
+
+                    // checkout stage and merge source
                     checkout([
-                        $class: 'GitSCM', 
-                        branches: [[name: 'origin/stage']], 
-                        doGenerateSubmoduleConfigurations: false, 
-                        extensions: [], 
-                        submoduleCfg: [], 
+                        $class: 'GitSCM',
+                        branches: [[name: "origin/stage"]],
                         userRemoteConfigs: [[
-                            credentialsId: "github-credentials", 
+                            credentialsId: "github-credentials",
                             url: "https://github.com/Projectproakash26/sbert-search-bar.git"
                         ]]
                     ])
-                    sh("git checkout stage")
-                    sh("git reset --hard HEAD")
-                    sh("git pull origin stage --rebase")
-                    sh("git merge origin/${sourceBranch} --no-edit")
-                    sh("git branch")
-                }  
-            }
-        }
-        
-        stage("Setup ML Environment") {
-            steps {
-                script {
-                    sh '''#!/usr/bin/env bash
-                    echo '[info] Setting up ML environment'
-                    
-                    # Check if environment exists
-                    if conda env list | grep -q sbar-code; then
-                        echo '[info] Environment exists, updating...'
-                        source activate sbar-code
-                        pip install -r requirements.txt
-                    else
-                        echo '[info] Creating new environment...'
-                        conda create -y -n sbar-code python=3.10
-                        source activate sbar-code
-                        pip install -r requirements.txt
-                    fi
-                    '''
+                    sh "git checkout stage"
+                    sh "git pull origin stage --rebase"
+                    sh "git merge origin/${sourceBranch} --no-edit"
                 }
             }
         }
-        
+
+        stage("Setup ML Environment") {
+            steps {
+                sh '''
+                #!/usr/bin/env bash
+                . $WORKSPACE/miniconda/etc/profile.d/conda.sh
+                echo "[info] Setting up ML environment"
+
+                if conda env list | grep -q sbar-code; then
+                    echo "[info] Environment exists"
+                else
+                    echo "[info] Creating environment"
+                    conda create -y -n sbar-code python=3.10
+                fi
+
+                conda activate sbar-code
+                pip install -r requirements.txt
+                '''
+            }
+        }
+
         stage("Functional Tests") {
             steps {
-                sh '''#!/usr/bin/env bash
-                source activate sbar-code
+                sh '''
+                #!/usr/bin/env bash
+                . $WORKSPACE/miniconda/etc/profile.d/conda.sh
+                conda activate sbar-code
                 python -m unittest discover -s test -p "test*.py"
                 '''
             }
         }
-        
+
         stage("Build Search Index") {
             steps {
-                sh'''#!/usr/bin/env bash
-                source activate sbar-code
-                git branch
+                sh '''
+                #!/usr/bin/env bash
+                . $WORKSPACE/miniconda/etc/profile.d/conda.sh
+                conda activate sbar-code
 
-                echo '[info] Before running engine.py' > log.txt
-                wc -l temp_ml/project_mappings.csv >> log.txt || echo "temp backup not found" >> log.txt
+                echo "[info] Before running engine.py" > log.txt
+                [ -f temp_ml/project_mappings.csv ] && wc -l temp_ml/project_mappings.csv >> log.txt
                 wc -l data/project_mappings.csv >> log.txt
 
-                echo '[info] Running engine.py ...'
                 python engine.py >> log.txt
 
-                echo '[info] After running engine.py' >> log.txt
-                wc -l temp_ml/project_mappings.csv >> log.txt || echo "temp backup not found" >> log.txt
+                echo "[info] After running engine.py" >> log.txt
+                [ -f temp_ml/project_mappings.csv ] && wc -l temp_ml/project_mappings.csv >> log.txt
                 wc -l data/project_mappings.csv >> log.txt
                 '''
             }
         }
-        
+
         stage("Push Changes to Stage") {
             steps {
                 script {
-                    sh '''#!/usr/bin/env bash
-                    source activate sbar-code
+                    sh '''
+                    #!/usr/bin/env bash
+                    . $WORKSPACE/miniconda/etc/profile.d/conda.sh
+                    conda activate sbar-code
                     python validate_changes.py >> log.txt
                     '''
-                    
-                    if (sh(returnStdout: true, script: "cat log.txt | tail -n 1").contains("CHANGE VALIDATION: SUCCESS")) {
-                        echo "[info] Changes in data, merging to stage"
-                        
-                        def commitMsg = env.CHANGE_ID ? 
+
+                    def lastLine = sh(returnStdout: true, script: "tail -n 1 log.txt").trim()
+
+                    if (lastLine.contains("CHANGE VALIDATION: SUCCESS")) {
+
+                        echo "[info] Validation success. Pushing to stage."
+
+                        def commitMsg = env.CHANGE_ID ?
                             "[jenkins-server autocommit] JenkinsMerge :: ${env.CHANGE_TITLE} #${env.CHANGE_ID}" :
                             "[jenkins-server autocommit] JenkinsMerge :: ${env.BRANCH_NAME}"
-                        
-                        sh("git add .")
-                        sh("git commit -m \"${commitMsg}\"")
-                        sh("git push https://github-credentials@github.com/Projectproakash26/sbert-search-bar.git stage")
+
+                        sh "git add ."
+                        sh "git commit -m \"${commitMsg}\""
+
+                        withCredentials([usernamePassword(credentialsId: 'github-credentials',
+                                                           usernameVariable: 'USER',
+                                                           passwordVariable: 'TOKEN')]) {
+                            sh """
+                            git push https://${USER}:${TOKEN}@github.com/Projectproakash26/sbert-search-bar.git stage
+                            """
+                        }
+
                     } else {
-                        echo "[info] No changes in data or search index broken by code change: aborting deployment"
+                        echo "[info] Validation failed."
                         currentBuild.result = 'ABORTED'
                         error("Validation failed")
                     }
                 }
             }
         }
-        
+
         stage("Deploy Changes to Production") {
             steps {
-                sh'''#!/usr/bin/env bash
+                sh '''
+                #!/usr/bin/env bash
                 git checkout prod
                 git pull origin prod --rebase
                 git merge stage --no-edit
                 git push origin prod
 
-                echo "[info] Triggering deployment to search bar server"
+                echo "[info] Triggering deployment..."
                 '''
                 build job: 'job-update-search-bar', parameters: []
             }
