@@ -18,9 +18,10 @@ pipeline {
                     echo "[info] Pull Request ID: ${env.CHANGE_ID ?: 'N/A'}"
                     echo "[info] Pull Request Title: ${env.CHANGE_TITLE ?: 'N/A'}"
 
+                    // Checkout target branch
                     checkout([$class: 'GitSCM',
                         branches: [[name: "origin/${baseBranch}"]],
-                        userRemoteConfigs: [[credentialsId: "github-credentials", url: "${GITHUB_REPO}"]]
+                        userRemoteConfigs: [[credentialsId: "", url: "${GITHUB_REPO}"]]
                     ])
                 }
                 sh '''
@@ -85,7 +86,7 @@ pipeline {
                 '''
             }
         }
-        stage("Push Changes to the Stage") {
+        stage("Push Changes to Stage") {
             steps {
                 script {
                     sh '''
@@ -93,17 +94,14 @@ pipeline {
                     '''
                     if (sh(returnStdout: true, script: "cat log.txt | tail -n 1").contains("CHANGE VALIDATION: SUCCESS")) {
                         echo "[info] Changes detected, merging to stage"
-                        def msg = env.CHANGE_TITLE ? "[jenkins-server autocommit] JenkinsMerge :: ${env.CHANGE_TITLE}->#${env.CHANGE_ID}" : "[jenkins-server autocommit] JenkinsMerge :: ${env.BRANCH_NAME}"
+                        def msg = env.CHANGE_TITLE ? "[jenkins-server autocommit] JenkinsMerge :: ${env.CHANGE_TITLE}->#${env.CHANGE_ID}" : "[jenkins-server autocommit] JenkinsMerge :: ${env.BRANCH_NAME}";
                         sh("git add .")
                         sh("git commit -m \"${msg}\" || true")
-                        withCredentials([usernamePassword(credentialsId: 'github-credentials',
-                                                           usernameVariable: 'GIT_USER',
-                                                           passwordVariable: 'GIT_TOKEN')]) {
+                        withCredentials([usernamePassword([[credentialsId: "github-credentials", url: "${GITHUB_REPO}"]]) {
                             sh("""
                                 git config --global user.email 'jenkins-ci@yourdomain'
-                                git config --global user.name "\${GIT_USER}"
-                                git remote set-url origin https://\${GIT_USER}:\${GIT_TOKEN}@github.com/Projectproakash26/sbert-search-bar.git
-                                git pull origin stage --rebase
+                                git config --global user.name "${GIT_USER}"
+                                git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/Projectproakash26/sbert-search-bar.git
                                 git push origin stage
                             """)
                         }
@@ -116,16 +114,11 @@ pipeline {
         }
         stage("Deploy Changes to Production") {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'github-credentials',
-                                                   usernameVariable: 'GIT_USER',
-                                                   passwordVariable: 'GIT_TOKEN')]) {
+                withCredentials([usernamePassword([[credentialsId: "github-credentials", url: "${GITHUB_REPO}"]]) {
                     sh("""
                         git checkout prod
                         git pull origin prod --rebase
-                        git merge stage --no-edit --allow-unrelated-histories
-                        git config --global user.name "\${GIT_USER}"
-                        git config --global user.email 'jenkins-ci@yourdomain'
-                        git remote set-url origin https://\${GIT_USER}:\${GIT_TOKEN}@github.com/Projectproakash26/sbert-search-bar.git
+                        git merge stage --no-edit
                         git push origin prod
                         echo "[info] Triggering deploy to search bar server"
                     """)
