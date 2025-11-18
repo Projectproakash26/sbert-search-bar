@@ -122,7 +122,7 @@ pipeline {
                     sh("""
                         git checkout prod
                         git pull origin prod --rebase
-                        git merge stage --no-edit
+                        git merge stage --no-edit --allow-unrelated-histories
                         git config --global user.name "\${GIT_USER}"
                         git config --global user.email 'jenkins-ci@yourdomain'
                         git remote set-url origin https://\${GIT_USER}:\${GIT_TOKEN}@github.com/Projectproakash26/sbert-search-bar.git
