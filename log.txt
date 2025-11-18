@@ -1,7 +1,7 @@
 [info] Before running engine.py
 13 temp_ml/project_mappings.csv
 13 data/project_mappings.csv
--------- Start Training Search Index: 2025-11-18 10:19:53.968394 --------
+-------- Start Training Search Index: 2025-11-18 10:20:38.242936 --------
 Raw data generated!
 Project mappings saved to query the results!
 path: data/project_mappings.csv
@@ -9,7 +9,7 @@ Abbreviations data read!
 Data preprocessing done!
 Embeddings created!
 FAISS index generated and saved in output!
--------- Done Training Search Index: 2025-11-18 10:19:58.793691 --------
+-------- Done Training Search Index: 2025-11-18 10:20:41.761824 --------
 [info] After running engine.py
 13 temp_ml/project_mappings.csv
 13 data/project_mappings.csv
