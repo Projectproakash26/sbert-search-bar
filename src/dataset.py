@@ -25,7 +25,7 @@ def get_video_titles():
         print("Error loading project_topics.csv:", e)
 
 
-# 3. Abbreviations Data
+# 3. Abbreviations Data new file incoming
 def get_abbreviations():
     """
     Retrieves abbreviations data from local Excel file.
