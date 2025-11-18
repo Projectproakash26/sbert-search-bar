@@ -11,7 +11,6 @@ pipeline {
                     notFailBuild: true,
                     patterns: [[pattern: '*', type: 'INCLUDE']]
                 )
-<<<<<<< HEAD
 
                 echo "[info] Pull Request Branch: ${env.CHANGE_BRANCH ?: env.BRANCH_NAME}"
                 echo "[info] Pull Request Target Branch: ${env.CHANGE_TARGET ?: 'stage'}"
@@ -34,7 +33,6 @@ pipeline {
                 mkdir -p temp_ml
                 cp data/project_mappings.csv temp_ml/project_mappings.csv || true
                 cp output/search.index temp_ml/search.index || true
-=======
 
                 script {
                     // Determine which branch to use - PR branch or regular branch
@@ -78,14 +76,11 @@ pipeline {
                 if [ -f output/search.index ]; then
                     cp output/search.index temp_ml/search.index
                 fi
->>>>>>> stage
                 '''
                 
                 script {
-<<<<<<< HEAD
                     def srcBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
                     def baseBranch = env.CHANGE_TARGET ?: "stage"
-=======
                     def sourceBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
                     
                     // Checkout source branch (PR branch or pushed branch)
@@ -101,12 +96,10 @@ pipeline {
                         ]]
                     ])
                     sh("git pull origin ${sourceBranch} --rebase")
->>>>>>> stage
                     
                     // Checkout stage and merge source branch
                     checkout([
                         $class: 'GitSCM', 
-<<<<<<< HEAD
                         branches: [[name: "origin/${srcBranch}"]], 
                         userRemoteConfigs: [[credentialsId: "github-credentials", url: "https://github.com/Projectproakash26/sbert-search-bar.git"]]
                     ])
@@ -123,7 +116,6 @@ pipeline {
                     sh "git merge origin/${srcBranch} --no-edit"
                     sh "git branch"
                 }
-=======
                         branches: [[name: 'origin/stage']], 
                         doGenerateSubmoduleConfigurations: false, 
                         extensions: [], 
@@ -139,7 +131,6 @@ pipeline {
                     sh("git merge origin/${sourceBranch} --no-edit")
                     sh("git branch")
                 }  
->>>>>>> stage
             }
         }
         
@@ -148,12 +139,10 @@ pipeline {
                 script {
                     sh '''
                     echo '[info] Setting up ML environment'
-<<<<<<< HEAD
                     conda env list | grep sbar-code
                     conda create -y -n sbar-code python=3.10
                     source activate sbar-code
                     pip install -r requirements.txt
-=======
                     
                     # Check if environment exists
                     if conda env list | grep -q sbar-code; then
@@ -166,7 +155,6 @@ pipeline {
                         source activate sbar-code
                         pip install -r requirements.txt
                     fi
->>>>>>> stage
                     '''
                 }
             }
@@ -186,7 +174,6 @@ pipeline {
                 sh '''
                 source activate sbar-code
                 git branch
-<<<<<<< HEAD
                 echo '[info] Before running engine.py'>log.txt
                 wc -l temp_ml/project_mappings.csv>>log.txt
                 wc -l data/project_mappings.csv>>log.txt
@@ -195,7 +182,6 @@ pipeline {
                 echo '[info] After running engine.py'>>log.txt
                 wc -l temp_ml/project_mappings.csv>>log.txt
                 wc -l data/project_mappings.csv>>log.txt
-=======
 
                 echo '[info] Before running engine.py' > log.txt
                 wc -l temp_ml/project_mappings.csv >> log.txt || echo "temp backup not found" >> log.txt
@@ -207,7 +193,6 @@ pipeline {
                 echo '[info] After running engine.py' >> log.txt
                 wc -l temp_ml/project_mappings.csv >> log.txt || echo "temp backup not found" >> log.txt
                 wc -l data/project_mappings.csv >> log.txt
->>>>>>> stage
                 '''
             }
         }
@@ -215,18 +200,15 @@ pipeline {
         stage("Push Changes to Stage") {
             steps {
                 script {
-<<<<<<< HEAD
                     sh '''
                     source activate sbar-code
                     python validate_changes.py >> log.txt
                     '''
-=======
                     sh '''#!/usr/bin/env bash
                     source activate sbar-code
                     python validate_changes.py >> log.txt
                     '''
                     
->>>>>>> stage
                     if (sh(returnStdout: true, script: "cat log.txt | tail -n 1").contains("CHANGE VALIDATION: SUCCESS")) {
                         echo "[info] Changes in data, merging to stage"
                         
@@ -235,7 +217,6 @@ pipeline {
                             "[jenkins-server autocommit] JenkinsMerge :: ${env.BRANCH_NAME}"
                         
                         sh("git add .")
-<<<<<<< HEAD
                         sh("git commit -m \"[jenkins-server autocommit] JenkinsMerge :: ${env.CHANGE_TITLE ?: env.BRANCH_NAME}->${env.CHANGE_ID ?: ''}\" || true")
                         withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
                             sh("""
@@ -245,10 +226,8 @@ pipeline {
                                 git push origin stage
                             """)
                         }
-=======
                         sh("git commit -m \"${commitMsg}\"")
                         sh("git push https://github-credentials@github.com/Projectproakash26/sbert-search-bar.git stage")
->>>>>>> stage
                     } else {
                         echo "[info] No changes in data or search index broken by code change: aborting deployment"
                         currentBuild.result = 'ABORTED'
@@ -260,7 +239,6 @@ pipeline {
         
         stage("Deploy Changes to Production") {
             steps {
-<<<<<<< HEAD
                 withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
                     sh("""
                         git checkout prod
@@ -274,7 +252,6 @@ pipeline {
                     """)
                 }
                 build job: 'job-update-searchbar', parameters: []
-=======
                 sh'''#!/usr/bin/env bash
                 git checkout prod
                 git pull origin prod --rebase
@@ -284,7 +261,6 @@ pipeline {
                 echo "[info] Triggering deployment to search bar server"
                 '''
                 build job: 'job-update-search-bar', parameters: []
->>>>>>> stage
             }
         }
     }
