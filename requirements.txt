@@ -16,4 +16,8 @@ transformers==4.28.1
 sentence-transformers==2.2.2
 
 # Huggingface hub
+<<<<<<< HEAD
 huggingface-hub==0.13.4
+=======
+huggingface-hub==0.13.4
+>>>>>>> stage
