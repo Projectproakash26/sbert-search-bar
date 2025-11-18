@@ -4,3 +4,4 @@ tests/__pycache__*
 data/*.bak
 output/*.bak
 *temp_ml*
+log.txt
