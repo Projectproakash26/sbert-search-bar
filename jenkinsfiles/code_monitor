@@ -12,6 +12,28 @@ pipeline {
                     patterns: [[pattern: '*', type: 'INCLUDE']]
                 )
 
+                echo "[info] Pull Request Branch: ${env.CHANGE_BRANCH ?: env.BRANCH_NAME}"
+                echo "[info] Pull Request Target Branch: ${env.CHANGE_TARGET ?: 'stage'}"
+                echo "[info] Current Branch: ${env.BRANCH_NAME}"
+
+                script {
+                    def prodBranch = "prod"
+                    def srcBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
+                    def baseBranch = env.CHANGE_TARGET ?: "stage"
+                    checkout([
+                        $class: 'GitSCM', 
+                        branches: [[name: "origin/${prodBranch}"]], 
+                        userRemoteConfigs: [[credentialsId: "github-credentials", url: "https://github.com/Projectproakash26/sbert-search-bar.git"]]
+                    ])
+                }
+
+                sh '''
+                echo '[info] Make backup of current prod data and model'
+                rm -rf temp_ml || echo "[info] temp_ml not found -- skipping"
+                mkdir -p temp_ml
+                cp data/project_mappings.csv temp_ml/project_mappings.csv || true
+                cp output/search.index temp_ml/search.index || true
+
                 script {
                     // Determine which branch to use - PR branch or regular branch
                     def sourceBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
@@ -55,8 +77,10 @@ pipeline {
                     cp output/search.index temp_ml/search.index
                 fi
                 '''
-
+                
                 script {
+                    def srcBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
+                    def baseBranch = env.CHANGE_TARGET ?: "stage"
                     def sourceBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
                     
                     // Checkout source branch (PR branch or pushed branch)
@@ -76,6 +100,22 @@ pipeline {
                     // Checkout stage and merge source branch
                     checkout([
                         $class: 'GitSCM', 
+                        branches: [[name: "origin/${srcBranch}"]], 
+                        userRemoteConfigs: [[credentialsId: "github-credentials", url: "https://github.com/Projectproakash26/sbert-search-bar.git"]]
+                    ])
+                    sh "git pull origin ${srcBranch} --rebase"
+                    
+                    checkout([
+                        $class: 'GitSCM', 
+                        branches: [[name: "origin/${baseBranch}"]], 
+                        userRemoteConfigs: [[credentialsId: "github-credentials", url: "https://github.com/Projectproakash26/sbert-search-bar.git"]]
+                    ])
+                    sh "git checkout ${baseBranch}"
+                    sh "git reset --hard HEAD"
+                    sh "git pull origin ${baseBranch} --rebase"
+                    sh "git merge origin/${srcBranch} --no-edit"
+                    sh "git branch"
+                }
                         branches: [[name: 'origin/stage']], 
                         doGenerateSubmoduleConfigurations: false, 
                         extensions: [], 
@@ -97,8 +137,12 @@ pipeline {
         stage("Setup ML Environment") {
             steps {
                 script {
-                    sh '''#!/usr/bin/env bash
+                    sh '''
                     echo '[info] Setting up ML environment'
+                    conda env list | grep sbar-code
+                    conda create -y -n sbar-code python=3.10
+                    source activate sbar-code
+                    pip install -r requirements.txt
                     
                     # Check if environment exists
                     if conda env list | grep -q sbar-code; then
@@ -118,7 +162,7 @@ pipeline {
         
         stage("Functional Tests") {
             steps {
-                sh '''#!/usr/bin/env bash
+                sh '''
                 source activate sbar-code
                 python -m unittest discover -s test -p "test*.py"
                 '''
@@ -127,9 +171,17 @@ pipeline {
         
         stage("Build Search Index") {
             steps {
-                sh'''#!/usr/bin/env bash
+                sh '''
                 source activate sbar-code
                 git branch
+                echo '[info] Before running engine.py'>log.txt
+                wc -l temp_ml/project_mappings.csv>>log.txt
+                wc -l data/project_mappings.csv>>log.txt
+                echo '[info] Running engine.py ...'
+                python engine.py>>log.txt
+                echo '[info] After running engine.py'>>log.txt
+                wc -l temp_ml/project_mappings.csv>>log.txt
+                wc -l data/project_mappings.csv>>log.txt
 
                 echo '[info] Before running engine.py' > log.txt
                 wc -l temp_ml/project_mappings.csv >> log.txt || echo "temp backup not found" >> log.txt
@@ -148,6 +200,10 @@ pipeline {
         stage("Push Changes to Stage") {
             steps {
                 script {
+                    sh '''
+                    source activate sbar-code
+                    python validate_changes.py >> log.txt
+                    '''
                     sh '''#!/usr/bin/env bash
                     source activate sbar-code
                     python validate_changes.py >> log.txt
@@ -161,6 +217,15 @@ pipeline {
                             "[jenkins-server autocommit] JenkinsMerge :: ${env.BRANCH_NAME}"
                         
                         sh("git add .")
+                        sh("git commit -m \"[jenkins-server autocommit] JenkinsMerge :: ${env.CHANGE_TITLE ?: env.BRANCH_NAME}->${env.CHANGE_ID ?: ''}\" || true")
+                        withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                            sh("""
+                                git config --global user.email 'jenkins-ci@yourdomain'
+                                git config --global user.name "${GIT_USER}"
+                                git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/Projectproakash26/sbert-search-bar.git
+                                git push origin stage
+                            """)
+                        }
                         sh("git commit -m \"${commitMsg}\"")
                         sh("git push https://github-credentials@github.com/Projectproakash26/sbert-search-bar.git stage")
                     } else {
@@ -174,6 +239,19 @@ pipeline {
         
         stage("Deploy Changes to Production") {
             steps {
+                withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                    sh("""
+                        git checkout prod
+                        git pull origin prod --rebase
+                        git merge stage --no-edit
+                        git config --global user.name "${GIT_USER}"
+                        git config --global user.email 'jenkins-ci@yourdomain'
+                        git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/Projectproakash26/sbert-search-bar.git
+                        git push origin prod
+                        echo "[info] ssh to the search bar server and pull the latest changes"
+                    """)
+                }
+                build job: 'job-update-searchbar', parameters: []
                 sh'''#!/usr/bin/env bash
                 git checkout prod
                 git pull origin prod --rebase
