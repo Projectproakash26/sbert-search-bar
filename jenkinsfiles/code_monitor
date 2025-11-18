@@ -85,7 +85,7 @@ pipeline {
                 '''
             }
         }
-        stage("Push Changes to Stage") {
+        stage("Push Changes to the Stage") {
             steps {
                 script {
                     sh '''
