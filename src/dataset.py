@@ -25,7 +25,11 @@ def get_video_titles():
         print("Error loading project_topics.csv:", e)
 
 
+<<<<<<< HEAD
 # 3. Abbreviations Data new file incoming
+=======
+# 3. Abbreviations Data
+>>>>>>> stage
 def get_abbreviations():
     """
     Retrieves abbreviations data from local Excel file.
@@ -34,4 +38,8 @@ def get_abbreviations():
         Abbreviations = pd.read_excel("data/Abbreviations.xlsx")
         return Abbreviations
     except Exception as e:
+<<<<<<< HEAD
         print("Error loading Abbreviations.xlsx:", e)
+=======
+        print("Error loading Abbreviations.xlsx:", e)
+>>>>>>> stage
