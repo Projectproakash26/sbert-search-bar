@@ -11,6 +11,8 @@ def get_project_description():
         return project_description
     except Exception as e:
         print("Error loading project_description.csv:", e)
+        print("TEST DEPLOY — AKASH 1")
+
 
 
 # 2. Video Titles Data
